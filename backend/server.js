@@ -11,76 +11,164 @@ app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Função para gerar PDF no formato da POS58
-function gerarPDF(ticket, filename) {
-  return new Promise((resolve) => {
-    const doc = new PDFDocument({
-      size: [160, 200], // largura 58mm
-      margins: { top: 10, left: 10, right: 10, bottom: 10 }
-    });
+// ================= ESC/POS HELPERS =================
 
-    const stream = fs.createWriteStream(filename);
-    doc.pipe(stream);
-
-    const formatarDataHora = (valor) => {
-      const [data, hora] = valor.split(" ");
-      return { data, hora };
-    };
-
-    const entrada = formatarDataHora(ticket.start);
-    const saida = formatarDataHora(ticket.end);
-
-    doc.fontSize(14).text("= EstacionaFácil =", { align: "center" });
-    doc.fontSize(12).text(`Ticket: ${ticket.id}`);
-    doc.text(`Placa: ${ticket.plate}`);
-    doc.text(`Vaga: ${ticket.slot}`);
-    doc.text(`Entrada: ${entrada.data}`);
-    doc.text(`Horário Entrada: ${entrada.hora}`);
-    doc.text(`Saída: ${saida.data}`);
-    doc.text(`Horário Saída: ${saida.hora}`);
-    doc.text(`Total: R$ ${ticket.total}`);
-    doc.text(`Pagamento: ${ticket.method}`);
-    doc.moveDown(0.5);
-    doc.fontSize(10).text("Obrigado pela preferência!", { align: "center" });
-
-    doc.end();
-    stream.on("finish", () => resolve(filename));
-  });
+function escposInit() {
+  return "\x1B\x40"; // Initialize
 }
 
-// ✅ Endpoint para gerar PDF e enviar ao celular
-app.post("/gerar-ticket", async (req, res) => {
+function escposAlignCenter() {
+  return "\x1B\x61\x01";
+}
+
+function escposAlignLeft() {
+  return "\x1B\x61\x00";
+}
+
+function escposBoldOn() {
+  return "\x1B\x45\x01";
+}
+
+function escposBoldOff() {
+  return "\x1B\x45\x00";
+}
+
+function escposDoubleSizeOn() {
+  return "\x1D\x21\x11"; // width x2, height x2
+}
+
+function escposDoubleSizeOff() {
+  return "\x1D\x21\x00";
+}
+
+function escposNewLines(n = 1) {
+  return "\n".repeat(n);
+}
+
+function escposCut() {
+  return "\x1D\x56\x41\x10"; // Partial cut
+}
+
+// QR Code ESC/POS (versão simples)
+function escposQrCode(data) {
+  const storeLen = data.length + 3;
+  const pL = storeLen & 0xff;
+  const pH = (storeLen >> 8) & 0xff;
+
+  const bytes = [];
+
+  // Select model: 2
+  bytes.push(0x1D,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00);
+  // Size
+  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x43,0x04);
+  // Error level M
+  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x45,0x31);
+  // Store data
+  bytes.push(0x1D,0x28,0x6B,pL,pH,0x31,0x50,0x30);
+  for (let i = 0; i < data.length; i++) {
+    bytes.push(data.charCodeAt(i));
+  }
+  // Print
+  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x51,0x30);
+
+  return Buffer.from(bytes).toString("binary");
+}
+
+// ================= GERADOR ESC/POS DO TICKET =================
+
+function gerarEscPosTicket(ticket) {
+  // ticket: { id, plate, slot, start, end, chargedMinutes, subtotal, discount, extra, total, method, pixPayload? }
+
+  let escpos = "";
+  escpos += escposInit();
+
+  // Cabeçalho
+  escpos += escposAlignCenter();
+  escpos += escposDoubleSizeOn();
+  escpos += "= EstacionaFácil =\n";
+  escpos += escposDoubleSizeOff();
+  escpos += escposNewLines(1);
+
+  escpos += escposBoldOn();
+  escpos += "COMPROVANTE DE ESTACIONAMENTO\n";
+  escpos += escposBoldOff();
+  escpos += "------------------------------\n";
+
+  // Dados principais
+  escpos += escposAlignLeft();
+  escpos += `Ticket: ${ticket.id}\n`;
+  escpos += `Placa: ${ticket.plate}\n`;
+  escpos += `Vaga: ${ticket.slot}\n`;
+  escpos += `Entrada: ${ticket.start}\n`;
+  escpos += `Saída:   ${ticket.end}\n`;
+  escpos += `Tempo:   ${ticket.chargedMinutes} min\n`;
+  escpos += "------------------------------\n";
+
+  // Valores
+  escpos += `Subtotal: R$ ${ticket.subtotal.toFixed(2)}\n`;
+  escpos += `Desconto: R$ ${ticket.discount.toFixed(2)}\n`;
+  escpos += `Extras:   R$ ${ticket.extra.toFixed(2)}\n`;
+  escpos += "------------------------------\n";
+  escpos += escposBoldOn();
+  escpos += `TOTAL:    R$ ${ticket.total.toFixed(2)}\n`;
+  escpos += escposBoldOff();
+  escpos += `Pagamento: ${ticket.method}\n`;
+  escpos += "------------------------------\n";
+
+  // Se tiver PIX, imprime QR Code
+  if (ticket.method === "PIX" && ticket.pixPayload) {
+    escpos += escposAlignCenter();
+    escpos += "PAGAMENTO VIA PIX\n";
+    escpos += "Escaneie o QR Code abaixo:\n";
+    escpos += escposNewLines(1);
+    escpos += escposQrCode(ticket.pixPayload);
+    escpos += escposNewLines(1);
+  }
+
+  escpos += escposAlignCenter();
+  escpos += escposNewLines(1);
+  escpos += "Obrigado pela preferência!\n";
+  escpos += "Guarde este comprovante.\n";
+  escpos += escposNewLines(3);
+  escpos += escposCut();
+
+  return escpos;
+}
+
+// ================= ENDPOINT ESC/POS =================
+
+app.post("/gerar-ticket-escpos", (req, res) => {
   try {
     const ticket = req.body;
-
-    const filename = path.join(__dirname, `ticket-${Date.now()}.pdf`);
-    await gerarPDF(ticket, filename);
-
-    res.download(filename, "ticket.pdf", () => {
-      fs.unlinkSync(filename);
-    });
-
+    const escpos = gerarEscPosTicket(ticket);
+    res.setHeader("Content-Type", "text/plain; charset=binary");
+    res.send(escpos);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ ok: false, error: "Falha ao gerar ticket." });
+    res.status(500).json({ ok: false, error: "Erro ao gerar ESC/POS" });
   }
 });
 
-// ✅ PIX
+// ================= PIX =================
+
 app.post("/gerar-pix", (req, res) => {
   const paymentId = "PIX-" + Date.now();
   const valor = req.body.total || "0.00";
+
+  // Aqui você pode depois trocar por um payload Pix oficial (EMV)
   const chave = "chavepix123";
-  const payload = `${chave}|valor=${valor}`;
+  const payload = `${chave}|valor=${valor}|pid=${paymentId}`;
 
   res.json({
     qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(payload)}`,
     qrText: payload,
-    paymentId
+    paymentId,
+    pixPayload: payload
   });
 });
 
-// ✅ Porta dinâmica para Render
+// ================= PORTA RENDER =================
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

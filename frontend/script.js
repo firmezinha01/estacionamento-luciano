@@ -1,5 +1,5 @@
-// URL do backend no Render
-const API = "https://estaciona-facil.onrender.com";
+// API do backend
+const API = "https://estaciona-facil-l8lj.onrender.com";
 
 // Estado da aplicação
 const state = {
@@ -24,12 +24,6 @@ function showMessage(msg, type="info"){
     $message.textContent = msg;
     $message.className = `muted ${type}`;
   }
-}
-
-// Debug na tela
-function debugLog(msg){
-  console.log(msg);
-  showMessage("[DEBUG] " + msg, "info");
 }
 
 // Relógio
@@ -78,7 +72,8 @@ function createTicket(){
   const id=String(state.seq++).padStart(6,'0');
   state.tickets.push({id,plate,slot,note:$note.value.trim(),start,status:'ativo'});
   $plate.value=$slot.value=$note.value=$startTime.value='';
-  renderActive(); renderFinishSelect();
+  renderActive(); 
+  renderFinishSelect();
   showMessage(`Ticket ${id} criado para placa ${plate}.`,'success');
 }
 $create?.addEventListener('click',createTicket);
@@ -186,7 +181,8 @@ function updateCalc(){
     extra: c.extra,
     total: Number(c.total.toFixed(2)),
     method: null,
-    ts: new Date()
+    ts: new Date(),
+    pixPayload: null
   };
   state.currentPayment = current;
 
@@ -194,16 +190,8 @@ function updateCalc(){
   if(method==='pix') renderPIX(current);
   else if(method==='card') renderCardSmart(current);
   else if(method==='cash') renderCash(current);
-
-  $confirmPayment.disabled = false;
-  if(!$confirmPayment.onclick){
-    $confirmPayment.onclick = () => {
-      showMessage("Nenhuma ação definida para este método de pagamento.","error");
-    };
-  }
 }
 
-// Escuta mudanças para recalcular
 [$finishTicket,$endTime,$payMethod,$lostTicket,$rateHour,$minFraction,$fraction,$lostFee,$discount,$dailyMax]
   .forEach(el=>el?.addEventListener('change',updateCalc));
 
@@ -245,6 +233,7 @@ async function renderPIX(current) {
 
     state.currentPayment.method = 'PIX';
     state.currentPayment.paymentId = data.paymentId;
+    state.currentPayment.pixPayload = data.pixPayload;
   } catch (err) {
     if($pixArea) $pixArea.innerHTML = "<p style='color:red'>Erro ao gerar QR Code PIX.</p>";
     showMessage('Erro ao gerar PIX: ' + err.message,'error');
@@ -284,114 +273,6 @@ function renderCash(current){
   state.currentPayment.method = 'DINHEIRO';
 }
 
-// Texto do recibo (para Bluetooth / debug)
-function buildTicketText() {
-  const r = state.lastReceipt;
-  if (!r) return "";
-  return [
-    "=== EstacionaFácil ===",
-    `Ticket: ${r.id}`,
-    `Placa: ${r.plate}`,
-    `Vaga: ${r.slot}`,
-    `Entrada: ${r.start}`,
-    `Saída: ${r.end}`,
-    `Tempo: ${r.chargedMinutes} min`,
-    "----------------------",
-    `Subtotal: ${fmtBRL(r.subtotal)}`,
-    `Desconto: ${fmtBRL(r.discount)}`,
-    `Taxa extra: ${fmtBRL(r.extra)}`,
-    `Total: ${fmtBRL(r.total)}`,
-    `Pagamento: ${r.method}`,
-    "",
-    "Obrigado pela preferência!"
-  ].join("\n");
-}
-
-// Impressão via PDF (Android + RawBT)
-async function printReceiptPDF() {
-  const r = state.lastReceipt;
-  if (!r) {
-    showMessage("Nenhum recibo para imprimir.", "error");
-    return;
-  }
-
-  try {
-    const resp = await fetch(`${API}/gerar-ticket`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(r)
-    });
-
-    if (!resp.ok) {
-      showMessage("Erro ao gerar PDF no servidor.", "error");
-      return;
-    }
-
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-
-    window.open(url, "_blank"); // Android → PDF → RawBT
-
-    showMessage(`PDF do ticket ${r.id} gerado e enviado para impressão.`, "success");
-  } catch (err) {
-    showMessage("Falha ao gerar PDF: " + err.message, "error");
-  }
-}
-
-// Impressão no Android (fallback nativo, se quiser usar)
-function imprimirNoAndroidFallback() {
-  const texto = buildTicketText();
-  if (!texto || texto.trim().length < 10) {
-    showMessage("Recibo vazio. Finalize o ticket antes de imprimir.", "error");
-    return;
-  }
-  const win = window.open('', '_blank', 'width=480,height=640');
-  win.document.write('<pre style="font:14px monospace;white-space:pre-wrap">' + texto.replace(/</g,'&lt;') + '</pre>');
-  win.document.close();
-  win.print();
-  showMessage("Recibo enviado para impressão nativa do Android.", "success");
-}
-
-// ====== Bluetooth (PC) ======
-// Aqui pressupondo que você já tem btCharacteristic, btConnect, escposInit, escposCenter etc.
-// Se ainda não tiver, pode comentar essa parte.
-
-async function imprimirViaBluetooth() {
-  try {
-    if (!window.btCharacteristic) {
-      debugLog("Bluetooth não configurado neste código. Ajuste btConnect / ESC/POS se quiser usar no PC.");
-      showMessage("Bluetooth não está configurado neste frontend.", "error");
-      return;
-    }
-    const encoder = new TextEncoder();
-    const text = buildTicketText();
-    if (!text || text.trim().length < 10) {
-      showMessage("Recibo vazio. Finalize o ticket antes de imprimir.", "error");
-      return;
-    }
-    const payloadParts = [
-      escposInit(),
-      escposCenter(),
-      encoder.encode("= EstacionaFácil =\n"),
-      escposLeft(),
-      encoder.encode(text.replace("= EstacionaFácil =\n", "")),
-      escposNewlines(3),
-      escposCut()
-    ];
-    let totalLen = payloadParts.reduce((acc, p) => acc + p.length, 0);
-    let all = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const part of payloadParts) {
-      all.set(part, offset);
-      offset += part.length;
-    }
-    await btWriteChunks(all);
-    showMessage("Ticket enviado para a POS58 via Bluetooth!", "success");
-  } catch (err) {
-    showMessage("Falha ao imprimir via Bluetooth.", "error");
-  }
-}
-
 // Finalização do ticket
 function finalizeTicketAndHistory(method){
   const id=$finishTicket?.value; if(!id) return;
@@ -401,12 +282,10 @@ function finalizeTicketAndHistory(method){
   const end=$endTime?.value?new Date($endTime.value):new Date();
   const c=computeCharge(t,end);
 
-  // Remove do ativo
   state.tickets.splice(idx,1);
   renderActive(); 
   renderFinishSelect();
 
-  // Registro histórico
   const entry = {
     id: t.id,
     plate: t.plate,
@@ -419,13 +298,14 @@ function finalizeTicketAndHistory(method){
     extra: c.extra,
     total: Number(c.total.toFixed(2)),
     method,
-    ts: new Date()
+    ts: new Date(),
+    pixPayload: state.currentPayment?.pixPayload || null
   };
   state.history.unshift(entry);
   renderHistory();
 
-  // Atualiza recibo
   clearPaymentUI();
+
   state.lastReceipt = {
     id: entry.id,
     plate: entry.plate,
@@ -438,17 +318,14 @@ function finalizeTicketAndHistory(method){
     extra: entry.extra,
     total: entry.total,
     method: entry.method,
-    ts: entry.ts
+    ts: entry.ts,
+    pixPayload: entry.pixPayload
   };
 
   showMessage(`Ticket ${t.id} finalizado com pagamento: ${method}.`,'success');
 
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (isAndroid) {
-    printReceiptPDF(); // PDF via backend → RawBT
-  } else {
-    imprimirViaBluetooth(); // PC
-  }
+  // Imprime automaticamente após pagamento
+  imprimirTicket(state.lastReceipt);
 }
 
 // Histórico
@@ -498,9 +375,10 @@ function renderHistory(){
           extra: entry.extra,
           total: entry.total,
           method: entry.method,
-          ts: entry.ts
+          ts: entry.ts,
+          pixPayload: entry.pixPayload
         };
-        printReceiptPDF();
+        imprimirTicket(state.lastReceipt);
       } else if(action==='remove'){
         state.history = state.history.filter(x=>x.id!==id);
         renderHistory();
@@ -510,8 +388,42 @@ function renderHistory(){
   });
 }
 
+// ======== IMPRESSÃO VIA RAWBT (ESC/POS) ========
+
+async function imprimirTicket(ticket) {
+  if (!ticket) {
+    showMessage("Nenhum recibo disponível para impressão.", "error");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/gerar-ticket-escpos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ticket)
+    });
+
+    if (!res.ok) {
+      showMessage("Erro ao gerar ESC/POS no servidor.", "error");
+      return;
+    }
+
+    const escpos = await res.text();
+    const base64 = btoa(escpos);
+
+    window.location.href = "rawbt:base64," + base64;
+    showMessage(`Ticket ${ticket.id} enviado para impressão (RawBT).`,"success");
+  } catch (err) {
+    showMessage("Falha ao imprimir: " + err.message,"error");
+  }
+}
+
 // Botão de imprimir comprovante
-$printReceipt?.addEventListener('click', printReceiptPDF);
+if($printReceipt){
+  $printReceipt.addEventListener('click', () => {
+    imprimirTicket(state.lastReceipt);
+  });
+}
 
 // Cancelar pagamento
 function cancelPayment(){
