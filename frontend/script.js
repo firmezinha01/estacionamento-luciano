@@ -1,5 +1,5 @@
 // API do backend
-const API = "https://estacionamento-luciano-backend.onrender.com";
+const API = "https://estacionamento-backend-cgl4.onrender.com";
 
 // Estado
 const state = {
