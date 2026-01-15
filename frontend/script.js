@@ -1,6 +1,5 @@
-
 // API do backend
-const API = "http://localhost:3000";
+const API = "https://estacionamento-luciano-backend.onrender.com";
 
 // Estado
 const state = {
