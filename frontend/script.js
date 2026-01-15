@@ -186,8 +186,8 @@ async function finalizeTicketAndHistory(method){
       window.open(rawbtUrl);
 
       // Serviço de Impressão ESC/POS
-      const escposUrl = `escpos://print?data=${encodeURIComponent(escpos)}`;
-      window.open(escposUrl);
+      // const escposUrl = `escpos://print?data=${encodeURIComponent(escpos)}`;
+      // window.open(escposUrl);
 
       showMessage("Comprovante enviado para impressão.", "success");
     } catch (err) {
