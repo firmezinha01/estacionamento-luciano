@@ -1,14 +1,14 @@
 const CACHE_NAME = "estaciona-cache-v4";
 
 const urlsToCache = [
-  "/",
-  "/index.html",
-  "/style.css",
-  "/script.js",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/offline.html"
+  "./",
+  "./index.html",
+  "./style.css",
+  "./script.js",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./offline.html"
 ];
 
 // Instalação
@@ -71,3 +71,6 @@ self.addEventListener("fetch", event => {
       })
   );
 });
+
+
+

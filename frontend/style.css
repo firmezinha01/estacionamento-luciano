@@ -1,3 +1,9 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 :root{
   --bg:#0f172a;      
   --panel:#111827;  
@@ -23,7 +29,7 @@ a{color:var(--accent)}
 .app{
   max-width:1200px;
   margin:0 auto;
-  padding:24px;
+  padding:clamp(12px, 2vw, 24px);
   display:grid;
   grid-template-columns:1fr;
   gap:16px;
@@ -38,12 +44,16 @@ header{
   padding:16px;
   border-radius:12px;
 }
-header h1{margin:0;font-size:20px;letter-spacing:0.4px}
+header h1{
+  margin:0;
+  font-size:clamp(18px, 2vw, 24px);
+  letter-spacing:0.4px;
+}
 header .clock{font-variant-numeric:tabular-nums;color:var(--muted)}
 
 .grid{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap:16px;
 }
 
@@ -53,16 +63,17 @@ header .clock{font-variant-numeric:tabular-nums;color:var(--muted)}
   padding:16px;
   border-radius:12px;
 }
-.card h2{margin:0 0 12px 0;font-size:16px}
+.card h2{margin:0 0 12px 0;font-size:clamp(15px, 1.8vw, 18px)}
 
-label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px}
+label{display:block;margin-bottom:6px;color:var(--text);font-size:13px}
 input,select,textarea{
   width:100%;
   padding:10px 12px;
   border-radius:8px;
   border:1px solid #333;
-  background:#0b1220;
-  color:var(--text);
+  background:#fbfbfc;
+  color:var(--panel);
+  font-size:16px;
 }
 
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -75,9 +86,10 @@ input,select,textarea{
   border-radius:10px;
   border:1px solid #333;
   background:#0b1220;
-  color:var(--text);
+  color:var(--muted);
   cursor:pointer;
   user-select:none;
+  min-width:120px;
 }
 .btn.primary{background:var(--primary);border-color:#1f9c48;color:#072b12;font-weight:600}
 .btn.danger{background:var(--danger);border-color:#b91c1c;color:#2b0b0b;font-weight:600}
@@ -123,13 +135,19 @@ input,select,textarea{
 
 .small{font-size:12px;color:var(--muted)}
 
-.table{width:100%;border-collapse:collapse;margin-top:8px}
+.table{
+  width:100%;
+  max-width:100%;
+  border-collapse:collapse;
+  margin-top:8px;
+  overflow-x:auto;
+  display:block;
+}
 .table th,.table td{border-bottom:1px solid #222;padding:8px;text-align:left;font-size:14px}
 .table th{color:#cbd5e1}
 
 .actions{display:flex;gap:6px;justify-content:flex-end}
 .kbd{border:1px solid #333;background:#0b1220;border-radius:6px;padding:2px 6px}
-
 
 @media print{
   body{background:white;color:black}
@@ -145,26 +163,39 @@ input,select,textarea{
  
 .printable{display:none}
 
-
 @media (max-width: 768px) {
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;   
+  }
+
+  .hora { 
+    display: flex;
+    justify-content: space-evenly;
+  }
+
+  .clock {
+    text-align: right; 
+    font-size: 22px;
+    margin-left: 90px;
+  }
+
   .grid {
-    grid-template-columns: 1fr; 
+  width: 100%;
   }
 
   header h1 { font-size: 18px; }
   .card h2 { font-size: 15px; }
-
-.card {
-  max-width: 95%;
-}
+  .card { width: 100%; }
 
   .ticket {
     grid-template-columns: 1fr; 
-    gap: 4px;
+    gap: 6px;
   }
 
   .row {
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr; /* inputs em uma coluna */
   }
 
   .btn {
@@ -172,21 +203,14 @@ input,select,textarea{
     justify-content: center;
   }
 
-  #btTest { pointer-events: auto; }
-
   .table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
     font-size: 12px;
+    display: block;
+    overflow-x: auto;   /* rolagem horizontal se precisar */
+    white-space: nowrap;
   }
 
   input, select, textarea {
-    width: 100%;
-    font-size: 16px; 
-  }
-
-  .app {
-    padding: 12px; 
+    font-size: 16px;    /* tamanho confortável para toque */
   }
 }

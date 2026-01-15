@@ -1,94 +1,74 @@
 import express from "express";
 import cors from "cors";
-import fs from "fs";
+import { Pool } from "pg";
+import ticketsRouter from "./routes/tickets.js";
+import dotenv from "dotenv";
+import os from "os";
 import PDFDocument from "pdfkit";
-import path from "path";
-import { fileURLToPath } from "url";
+
+dotenv.config();
+console.log("DATABASE_URL:", process.env.DATABASE_URL);
+
+// Força timezone São Paulo
+process.env.TZ = "America/Sao_Paulo";
+
+// Conexão com Neon
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Garante timezone na sessão do Postgres
+pool.query("SET TIME ZONE 'America/Sao_Paulo';").catch(err => {
+  console.error("Erro ao definir timezone:", err);
+});
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-
-// Necessário para usar __dirname em ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Rotas principais
+app.use("/tickets", ticketsRouter);
 
 // ================= ESC/POS HELPERS =================
+function escposInit() { return "\x1B\x40"; }
+function escposAlignCenter() { return "\x1B\x61\x01"; }
+function escposAlignLeft() { return "\x1B\x61\x00"; }
+function escposBoldOn() { return "\x1B\x45\x01"; }
+function escposBoldOff() { return "\x1B\x45\x00"; }
+function escposDoubleSizeOn() { return "\x1D\x21\x11"; }
+function escposDoubleSizeOff() { return "\x1D\x21\x00"; }
+function escposNewLines(n = 1) { return "\n".repeat(n); }
+function escposCut() { return "\x1D\x56\x41\x10"; }
 
-function escposInit() {
-  return "\x1B\x40"; // Initialize
-}
-
-function escposAlignCenter() {
-  return "\x1B\x61\x01";
-}
-
-function escposAlignLeft() {
-  return "\x1B\x61\x00";
-}
-
-function escposBoldOn() {
-  return "\x1B\x45\x01";
-}
-
-function escposBoldOff() {
-  return "\x1B\x45\x00";
-}
-
-function escposDoubleSizeOn() {
-  return "\x1D\x21\x11"; // width x2, height x2
-}
-
-function escposDoubleSizeOff() {
-  return "\x1D\x21\x00";
-}
-
-function escposNewLines(n = 1) {
-  return "\n".repeat(n);
-}
-
-function escposCut() {
-  return "\x1D\x56\x41\x10"; // Partial cut
-}
-
-// QR Code ESC/POS (versão simples)
+// QR Code ESC/POS
 function escposQrCode(data) {
   const storeLen = data.length + 3;
   const pL = storeLen & 0xff;
   const pH = (storeLen >> 8) & 0xff;
-
   const bytes = [];
 
-  // Select model: 2
   bytes.push(0x1D,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00);
-  // Size
   bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x43,0x04);
-  // Error level M
   bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x45,0x31);
-  // Store data
   bytes.push(0x1D,0x28,0x6B,pL,pH,0x31,0x50,0x30);
   for (let i = 0; i < data.length; i++) {
     bytes.push(data.charCodeAt(i));
   }
-  // Print
   bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x51,0x30);
 
   return Buffer.from(bytes).toString("binary");
 }
 
 // ================= GERADOR ESC/POS DO TICKET =================
-
-function gerarEscPosTicket(ticket) {
-  // ticket: { id, plate, slot, start, end, chargedMinutes, subtotal, discount, extra, total, method, pixPayload? }
-
+async function gerarEscPosTicket(ticket) {
   let escpos = "";
   escpos += escposInit();
 
-  // Cabeçalho
+  // Cabeçalho com nome em destaque
   escpos += escposAlignCenter();
   escpos += escposDoubleSizeOn();
-  escpos += "= EstacionaFácil =\n";
+  escpos += "LS ESTACIONAMENTO\n";
   escpos += escposDoubleSizeOff();
   escpos += escposNewLines(1);
 
@@ -97,29 +77,37 @@ function gerarEscPosTicket(ticket) {
   escpos += escposBoldOff();
   escpos += "------------------------------\n";
 
-  // Dados principais
   escpos += escposAlignLeft();
   escpos += `Ticket: ${ticket.id}\n`;
-  escpos += `Placa: ${ticket.plate}\n`;
-  escpos += `Vaga: ${ticket.slot}\n`;
-  escpos += `Entrada: ${ticket.start}\n`;
-  escpos += `Saída:   ${ticket.end}\n`;
-  escpos += `Tempo:   ${ticket.chargedMinutes} min\n`;
+  escpos += `Nome: ${ticket.nome || "--"}\n`;
+  escpos += `Telefone: ${ticket.telefone || "--"}\n`;
+  escpos += `Placa: ${ticket.placa}\n`;
+  escpos += `Vaga: ${ticket.vaga}\n`;
+  escpos += `Obs: ${ticket.observacoes || "--"}\n`;
+
+  const entradaFmt = ticket.entrada
+    ? new Date(ticket.entrada).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    : "--";
+  const saidaFmt = ticket.saida
+    ? new Date(ticket.saida).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    : "--";
+
+  escpos += `Entrada: ${entradaFmt}\n`;
+  escpos += `Saída:   ${saidaFmt}\n`;
   escpos += "------------------------------\n";
 
-  // Valores
-  escpos += `Subtotal: R$ ${ticket.subtotal.toFixed(2)}\n`;
-  escpos += `Desconto: R$ ${ticket.discount.toFixed(2)}\n`;
-  escpos += `Extras:   R$ ${ticket.extra.toFixed(2)}\n`;
+  escpos += `Subtotal: R$ ${Number(ticket.subtotal).toFixed(2)}\n`;
+  escpos += `Desconto: R$ ${Number(ticket.desconto).toFixed(2)}\n`;
+  escpos += `Extras:   R$ ${Number(ticket.taxa_extra).toFixed(2)}\n`;
   escpos += "------------------------------\n";
   escpos += escposBoldOn();
-  escpos += `TOTAL:    R$ ${ticket.total.toFixed(2)}\n`;
+  escpos += `TOTAL:    R$ ${Number(ticket.total).toFixed(2)}\n`;
   escpos += escposBoldOff();
-  escpos += `Pagamento: ${ticket.method}\n`;
+  escpos += `Pagamento: ${ticket.pagamento}\n`;
+  escpos += `Status: ${ticket.status}\n`;
   escpos += "------------------------------\n";
 
-  // Se tiver PIX, imprime QR Code
-  if (ticket.method === "PIX" && ticket.pixPayload) {
+  if (ticket.pagamento === "pix" && ticket.pixPayload) {
     escpos += escposAlignCenter();
     escpos += "PAGAMENTO VIA PIX\n";
     escpos += "Escaneie o QR Code abaixo:\n";
@@ -139,11 +127,10 @@ function gerarEscPosTicket(ticket) {
 }
 
 // ================= ENDPOINT ESC/POS =================
-
-app.post("/gerar-ticket-escpos", (req, res) => {
+app.post("/gerar-ticket-escpos", async (req, res) => {
   try {
     const ticket = req.body;
-    const escpos = gerarEscPosTicket(ticket);
+    const escpos = await gerarEscPosTicket(ticket);
     res.setHeader("Content-Type", "text/plain; charset=binary");
     res.send(escpos);
   } catch (err) {
@@ -153,12 +140,10 @@ app.post("/gerar-ticket-escpos", (req, res) => {
 });
 
 // ================= PIX =================
-
 app.post("/gerar-pix", (req, res) => {
   const paymentId = "PIX-" + Date.now();
   const valor = req.body.total || "0.00";
 
-  // Aqui você pode depois trocar por um payload Pix oficial (EMV)
   const chave = "chavepix123";
   const payload = `${chave}|valor=${valor}|pid=${paymentId}`;
 
@@ -170,9 +155,65 @@ app.post("/gerar-pix", (req, res) => {
   });
 });
 
-// ================= PORTA RENDER =================
+// ================= ROTA PADRÃO =================
+app.get("/", (req, res) => {
+  res.send("🚗 API Estacionamento rodando com sucesso!");
+});
 
 const PORT = process.env.PORT || 3000;
+
+// ================= PDF RELATÓRIO =================
+app.get("/tickets/pdf", async (req, res) => {
+  const { inicio, fim } = req.query;
+  try {
+    const result = await pool.query(
+      "SELECT * FROM tickets WHERE entrada BETWEEN $1 AND $2 ORDER BY entrada ASC",
+      [inicio, fim]
+    );
+
+    const doc = new PDFDocument();
+    res.setHeader("Content-Type", "application/pdf");
+    doc.pipe(res);
+
+    doc.fontSize(18).text("Relatório de Tickets", { align: "center" });
+    doc.moveDown();
+
+    result.rows.forEach(t => {
+      const entradaFmt = t.entrada
+        ? new Date(t.entrada).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+        : "--";
+      const saidaFmt = t.saida
+        ? new Date(t.saida).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+        : "--";
+
+      doc.fontSize(12).text(
+        `Ticket ${t.id} | Placa: ${t.placa} | Nome: ${t.nome} | Entrada: ${entradaFmt} | Saída: ${saidaFmt} | Total: R$ ${Number(t.total).toFixed(2)}`
+      );
+      doc.moveDown();
+    });
+
+    doc.end();
+  } catch (err) {
+    console.error("Erro ao gerar PDF:", err);
+    res.status(500).json({ error: "Erro ao gerar PDF" });
+  }
+});
+
+// Captura o IP local da máquina (para acessar pela rede)
+const interfaces = os.networkInterfaces();
+let localIP = "localhost";
+for (const name of Object.keys(interfaces)) {
+  for (const iface of interfaces[name]) {
+    if (iface.family === "IPv4" && !iface.internal) {
+      localIP = iface.address;
+    }
+  }
+}
+
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log("====================================");
+  console.log("🚀 Servidor rodando em:");
+  console.log(`➡ Local:   http://localhost:${PORT}`);
+  console.log(`➡ Rede:    http://${localIP}:${PORT}`);
+  console.log("====================================");
 });
