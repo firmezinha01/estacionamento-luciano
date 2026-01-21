@@ -17,198 +17,224 @@
 </head>
 
 <body>
-  <div class="app">
-    <header>
-      <div class="hora">
-        <img src="./logo.png" alt="Logo LS Estacionamento" width="48" height="48">
-        <div class="clock" id="clock">--:--:--</div>
+  <header>
+    <div class="hora">
+      <img src="./logo.png" alt="Logo LS Estacionamento" width="48" height="48">
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <div id="message" class="muted"></div>
+
+  <!-- Nova entrada -->
+  <div class="grid-column">
+    <section class="card">
+      <h2>Nova entrada</h2>
+      <div class="row">
+        <div>
+          <label>Nome</label>
+          <input id="name" placeholder="Nome completo" maxlength="25" />
+        </div>
+        <div>
+          <label>Telefone</label>
+          <input id="tel" type="tel" placeholder="(11)99999-9999" maxlength="14" />
+        </div>
       </div>
-    </header>
-
-    <div id="message" class="muted"></div>
-
-    <!-- Nova entrada -->
-    <div class="grid">
-      <section class="card">
-        <h2>Nova entrada</h2>
-        <div class="row">
-          <div>
-            <label>Nome</label>
-            <input id="name" placeholder="Nome completo" maxlength="50" />
-          </div>
-          <div>
-            <label>Telefone</label>
-            <input id="tel" type="tel" placeholder="(11) 99999-9999" maxlength="15" />
-          </div>
+      <div class="row">
+        <div>
+          <label>Marca/Modelo</label>
+          <input id="marca_modelo" placeholder="Marca e Modelo" maxlength="15" />
+          <label>Placa</label>
+          <input id="plate" placeholder="ABC1D23" maxlength="7" />
         </div>
-        <div class="row">
-          <div>
-            <label>Placa</label>
-            <input id="plate" placeholder="ABC1D23" maxlength="8" />
-          </div>
-          <div>
-            <label>Vaga</label>
-            <input id="slot" placeholder="A12" maxlength="6" />
-          </div>
+        <div>
+          <label>Vaga</label>
+          <input id="slot" placeholder="A12" maxlength="2" />
         </div>
-        <div class="row">
-          <div>
-            <label>Valor fixo diário (R$)</label>
-            <input id="dailyValue" type="number" step="0.01" placeholder="Ex.: 30.00" />
-          </div>
-          <div>
-            <label>Entrada</label>
-            <input id="startTime" type="datetime-local" />
-          </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Valor fixo diário (R$)</label>
+          <input id="dailyValue" type="number" step="0.01" placeholder="Ex.: 30.00" />
         </div>
-        <div class="row">
-          <div>
-            <label for="observacoes">Observações:</label>
-            <textarea id="observacoes" placeholder="Ex.: Avaria no carro, cliente preferencial"></textarea>
-            <!-- <label>Observações</label>
-            <input id="note" placeholder="Ex.: Avaria no carro" /> -->
-          </div>
+        <div>
+          <label>Entrada</label>
+          <input id="startTime" type="datetime-local" />
         </div>
-        <div class="flex" style="margin-top:10px">
-          <button class="btn primary" id="createTicket">Gerar ticket</button>
-          <span class="muted">Atalho: <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
+      </div>
+      <div class="row">
+        <div>
+          <label for="observacoes">Observações:</label>
+          <textarea id="observacoes" placeholder="Ex.: Avaria no carro, cliente preferencial" maxlength="50"></textarea>
         </div>
-      </section>
-    </div>
+      </div>
+      <div class="flex" style="margin-top:10px">
+        <button class="btn primary" id="createTicket">Gerar ticket</button>
+        <span class="muted">Atalho: <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
+      </div>
 
-    <!-- Tickets ativos -->
-    <div class="grid">
-      <section class="card">
-        <h2>Tickets ativos</h2>
-        <div id="activeList" class="list"></div>
-      </section>
-    </div>
+      <div id="error-box"></div>
 
-    <!-- Encerrar e cobrar -->
-    <div class="grid">
-      <section class="card">
-        <h2>Encerrar e cobrar</h2>
-        <div class="row">
-          <div>
-            <label>Ticket</label>
-            <select id="finishTicket"></select>
-          </div>
-          <div>
-            <label>Saída</label>
-            <input id="endTime" type="datetime-local" />
-          </div>
+    </section>
+  </div>
+
+  <!-- Tickets ativos -->
+  <div class="grid-column">
+    <section class="card">
+      <h2>Tickets ativos</h2>
+      <div id="activeList" class="list"></div>
+    </section>
+  </div>
+
+  <!-- Encerrar e cobrar -->
+  <div class="grid-column">
+    <section class="card">
+      <h2>Encerrar e cobrar</h2>
+      <div class="row">
+        <div>
+          <label>Ticket</label>
+          <select id="finishTicket"></select>
         </div>
-        <div class="divider"></div>
-        <div class="row">
-          <div>
-            <label>Meio de pagamento</label>
-            <select id="payMethod">
-              <option value="">Selecione</option>
-              <option value="pix">PIX</option>
-              <option value="card">Cartão na Smart</option>
-              <option value="cash">Dinheiro</option>
-            </select>
-          </div>
-          <div>
-            <label>Ticket perdido?</label>
-            <select id="lostTicket">
-              <option value="no">Não</option>
-              <option value="yes">Sim</option>
-            </select>
-          </div>
+        <div>
+          <label>Saída</label>
+          <input id="endTime" type="datetime-local" />
         </div>
-
-        <div id="calcArea" style="margin-top:10px"></div>
-        <div id="pixArea" style="margin-top:10px"></div>
-        <div id="cardArea" style="margin-top:10px"></div>
-        <div id="cashArea" style="margin-top:10px"></div>
-
-        <div class="flex" style="margin-top:10px">
-          <button class="btn accent" id="confirmPayment" disabled>Confirmar pagamento</button>
-          <button class="btn" id="printReceipt" disabled>Imprimir comprovante</button>
-          <button class="btn danger no-print" id="cancelPayment">Cancelar</button>
-        </div>
-      </section>
-    </div>
-
-    <!-- Histórico -->
-    <div class="grid">
-      <section class="card">
-        <h2>Histórico</h2>
-        <table class="table" id="historyTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nome</th>
-              <th>Telefone</th>
-              <th>Placa</th>
-              <th>Entrada</th>
-              <th>Saída</th>
-              <th>Subtotal</th>
-              <th>Desconto</th>
-              <th>Taxa extra</th>
-              <th>Total</th>
-              <th>Pagamento</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
-    </div>
-
-    <div class="flex" style="margin-top:10px">
-  <button class="btn danger" id="clearHistory">Limpar histórico</button>
-</div>
-
-    <!-- ✅ Relatório PDF -->
-    <div class="grid">
-      <section class="card">
-        <h2>Gerar Relatório em PDF</h2>
-        <div class="row">
-          <div>
-            <label>Data inicial</label>
-            <input id="pdfStart" type="date" />
-          </div>
-          <div>
-            <label>Data final</label>
-            <input id="pdfEnd" type="date" />
-          </div>
-        </div>
-        <div class="flex" style="margin-top:10px">
-          <button class="btn primary" id="generatePdf">Gerar PDF</button>
-        </div>
-      </section>
-    </div>
-
-    
-    <!-- Comprovante -->
-    <div id="printable" class="printable">
-      <h3>Comprovante de estacionamento</h3>
-      <div class="price-line"><span>Estabelecimento:</span><span id="p_company">LS Estacionamento</span></div>
-      <div class="price-line"><span>Endereço:</span><span id="p_addr">Guarulhos - SP</span></div>
+      </div>
       <div class="divider"></div>
-      <div class="price-line"><span>Ticket:</span><span id="p_id"></span></div>
-      <div class="price-line"><span>Nome:</span><span id="p_name"></span></div>
-      <div class="price-line"><span>Telefone:</span><span id="p_tel"></span></div>
-      <div class="price-line"><span>Placa:</span><span id="p_plate"></span></div>
-      <div class="price-line"><span>Vaga:</span><span id="p_slot"></span></div>
-      <div class="price-line"><span>Entrada:</span><span id="p_start"></span></div>
-      <div class="price-line"><span>Saída:</span><span id="p_end"></span></div>
-      <div class="price-line"><span>Tempo:</span><span id="p_duration"></span></div>
-      <div class="divider"></div>
-      <div class="price-line"><span>Valor fixo diário:</span><span id="p_dailyValue"></span></div>
-      <div class="price-line"><span>Subtotal:</span><span id="p_subtotal"></span></div>
-      <div class="price-line"><span>Desconto:</span><span id="p_discount"></span></div>
-      <div class="price-line"><span>Taxa extra:</span><span id="p_extra"></span></div>
-      <div class="price-line"><span>Total:</span><span id="p_total"></span></div>
-      <div class="price-line"><span>Pagamento:</span><span id="p_method"></span></div>
-      <div class="divider"></div>
-      <div class="small">Obrigado pela preferência!</div>
-    </div>
+      <div class="row">
+        <div>
+          <label>Meio de pagamento</label>
+          <select id="payMethod">
+            <option value="">Selecione</option>
+            <option value="pix">PIX</option>
+            <option value="card">Cartão na Smart</option>
+            <option value="cash">Dinheiro</option>
+          </select>
+        </div>
+      </div>
 
-    <div id="btStatus" class="muted" style="margin-top:8px"></div>
+      <div id="calcArea" style="margin-top:10px"></div>
+      <div id="pixArea" style="margin-top:10px"></div>
+      <div id="cardArea" style="margin-top:10px"></div>
+      <div id="cashArea" style="margin-top:10px"></div>
+
+      <div class="flex" style="margin-top:10px">
+        <button class="btn accent" id="confirmPayment" disabled>Confirmar pagamento</button>
+        <button class="btn danger no-print" id="cancelPayment">Cancelar</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Histórico -->
+  <div class="grid-column">
+    <!-- Histórico do dia -->
+    <section class="card">
+      <h2>Histórico do dia</h2>
+      <table class="table" id="historyTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Marca Modelo</th>
+            <th>Placa</th>
+            <th>Vaga</th>
+            <th>Entrada</th>
+            <th>Saída</th>
+            <th>Subtotal</th>
+            <th>Desconto</th>
+            <th>Taxa extra</th>
+            <th>Total</th>
+            <th>Pagamento</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="flex" style="margin-top:10px">
+        <button class="btn danger" id="clearHistory">Limpar histórico</button>
+      </div>
+    </section>
+
+    <!-- Histórico por data -->
+    <section class="card">
+      <h2>Histórico por data</h2>
+      <div class="flex" style="margin-bottom:10px; gap:10px;">
+        <input type="date" id="historyDate" />
+        <button class="btn primary" id="generateHistory">Gerar histórico</button>
+      </div>
+      <table class="table" id="historyTableByDate">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Marca Modelo</th>
+            <th>Placa</th>
+            <th>Vaga</th>
+            <th>Entrada</th>
+            <th>Saída</th>
+            <th>Subtotal</th>
+            <th>Desconto</th>
+            <th>Taxa extra</th>
+            <th>Total</th>
+            <th>Pagamento</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Relatório PDF -->
+    <section class="card">
+      <h2>Gerar Relatório em PDF</h2>
+      <div class="row">
+        <div>
+          <label>Data inicial</label>
+          <input id="pdfStart" type="date" />
+        </div>
+        <div>
+          <label>Data final</label>
+          <input id="pdfEnd" type="date" />
+        </div>
+      </div>
+      <div class="flex" style="margin-top:10px">
+        <button class="btn primary" id="generatePdf">Gerar PDF</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Comprovante -->
+  <div id="printable" class="printable">
+    <h3>Comprovante de estacionamento</h3>
+    <div class="price-line"><span>Estabelecimento:</span><span id="p_company">LS Estacionamento</span></div>
+    <div class="price-line"><span>Endereço:</span><span id="p_addr">Praia da Cigarra</span></div>
+    <div class="divider"></div>
+    <div class="price-line"><span>Ticket:</span><span id="p_id"></span></div>
+    <div class="price-line"><span>Nome:</span><span id="p_name"></span></div>
+    <div class="price-line"><span>Telefone:</span><span id="p_tel"></span></div>
+    <div class="price-line"><span>Marca Modelo:</span><span id="p_marca_modelo"></span></div>
+    <div class="price-line"><span>Placa:</span><span id="p_plate"></span></div>
+    <div class="price-line"><span>Vaga:</span><span id="p_slot"></span></div>
+    <div class="price-line"><span>Entrada:</span><span id="p_start"></span></div>
+    <div class="price-line"><span>Saída:</span><span id="p_end"></span></div>
+    <div class="price-line"><span>Tempo:</span><span id="p_duration"></span></div>
+    <div class="divider"></div>
+    <div class="price-line"><span>Valor fixo diário:</span><span id="p_dailyValue"></span></div>
+    <div class="price-line"><span>Subtotal:</span><span id="p_subtotal"></span></div>
+    <div class="price-line"><span>Desconto:</span><span id="p_discount"></span></div>
+    <div class="price-line"><span>Taxa extra:</span><span id="p_extra"></span></div>
+    <div class="price-line"><span>Total:</span><span id="p_total"></span></div>
+    <div class="price-line"><span>Pagamento:</span><span id="p_method"></span></div>
+    <div class="divider"></div>
+    <div class="small">Obrigado pela preferência!</div>
+  </div>
+
+  <div id="btStatus" class="muted" style="margin-top:8px"></div>
   </div>
 
   <script src="script.js"></script>
