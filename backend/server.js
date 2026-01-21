@@ -4,7 +4,6 @@ import { Pool } from "pg";
 import ticketsRouter from "./routes/tickets.js";
 import dotenv from "dotenv";
 import os from "os";
-import PDFDocument from "pdfkit";
 
 dotenv.config();
 console.log("DATABASE_URL:", process.env.DATABASE_URL);
@@ -48,14 +47,14 @@ function escposQrCode(data) {
   const pH = (storeLen >> 8) & 0xff;
   const bytes = [];
 
-  bytes.push(0x1D,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00);
-  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x43,0x04);
-  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x45,0x31);
-  bytes.push(0x1D,0x28,0x6B,pL,pH,0x31,0x50,0x30);
+  bytes.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+  bytes.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x04);
+  bytes.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31);
+  bytes.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
   for (let i = 0; i < data.length; i++) {
     bytes.push(data.charCodeAt(i));
   }
-  bytes.push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x51,0x30);
+  bytes.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
 
   return Buffer.from(bytes).toString("binary");
 }
@@ -66,21 +65,25 @@ async function gerarEscPosTicket(ticket) {
   escpos += escposInit();
 
   // Cabeçalho com nome em destaque
+  
   escpos += escposAlignCenter();
-  escpos += escposDoubleSizeOn();
+  escpos += escposDoubleWidthOn(); // só largura dupla
   escpos += "LS ESTACIONAMENTO\n";
-  escpos += escposDoubleSizeOff();
+  escpos += escposDoubleWidthOff();
   escpos += escposNewLines(1);
 
+  escpos += escposAlignCenter();
   escpos += escposBoldOn();
   escpos += "COMPROVANTE DE ESTACIONAMENTO\n";
   escpos += escposBoldOff();
   escpos += "------------------------------\n";
 
+  escpos += escposAlignCenter();
   escpos += escposAlignLeft();
   escpos += `Ticket: ${ticket.id}\n`;
   escpos += `Nome: ${ticket.nome || "--"}\n`;
   escpos += `Telefone: ${ticket.telefone || "--"}\n`;
+  escpos += `Marca_Modelo: ${ticket.marca_modelo || "--"}\n`;
   escpos += `Placa: ${ticket.placa}\n`;
   escpos += `Vaga: ${ticket.vaga}\n`;
   escpos += `Obs: ${ticket.observacoes || "--"}\n`;
@@ -92,10 +95,12 @@ async function gerarEscPosTicket(ticket) {
     ? new Date(ticket.saida).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
     : "--";
 
+  escpos += escposAlignCenter();
   escpos += `Entrada: ${entradaFmt}\n`;
   escpos += `Saída:   ${saidaFmt}\n`;
   escpos += "------------------------------\n";
 
+  escpos += escposAlignCenter();
   escpos += `Subtotal: R$ ${Number(ticket.subtotal).toFixed(2)}\n`;
   escpos += `Desconto: R$ ${Number(ticket.desconto).toFixed(2)}\n`;
   escpos += `Extras:   R$ ${Number(ticket.taxa_extra).toFixed(2)}\n`;
@@ -162,43 +167,6 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// ================= PDF RELATÓRIO =================
-app.get("/tickets/pdf", async (req, res) => {
-  const { inicio, fim } = req.query;
-  try {
-    const result = await pool.query(
-      "SELECT * FROM tickets WHERE entrada BETWEEN $1 AND $2 ORDER BY entrada ASC",
-      [inicio, fim]
-    );
-
-    const doc = new PDFDocument();
-    res.setHeader("Content-Type", "application/pdf");
-    doc.pipe(res);
-
-    doc.fontSize(18).text("Relatório de Tickets", { align: "center" });
-    doc.moveDown();
-
-    result.rows.forEach(t => {
-      const entradaFmt = t.entrada
-        ? new Date(t.entrada).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
-        : "--";
-      const saidaFmt = t.saida
-        ? new Date(t.saida).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
-        : "--";
-
-      doc.fontSize(12).text(
-        `Ticket ${t.id} | Placa: ${t.placa} | Nome: ${t.nome} | Entrada: ${entradaFmt} | Saída: ${saidaFmt} | Total: R$ ${Number(t.total).toFixed(2)}`
-      );
-      doc.moveDown();
-    });
-
-    doc.end();
-  } catch (err) {
-    console.error("Erro ao gerar PDF:", err);
-    res.status(500).json({ error: "Erro ao gerar PDF" });
-  }
-});
-
 // Captura o IP local da máquina (para acessar pela rede)
 const interfaces = os.networkInterfaces();
 let localIP = "localhost";
@@ -212,7 +180,7 @@ for (const name of Object.keys(interfaces)) {
 
 app.listen(PORT, () => {
   console.log("====================================");
-  console.log("🚀 Servidor rodando em:");
+  console.log("Servidor rodando em:");
   console.log(`➡ Local:   http://localhost:${PORT}`);
   console.log(`➡ Rede:    http://${localIP}:${PORT}`);
   console.log("====================================");
