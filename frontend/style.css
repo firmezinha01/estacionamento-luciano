@@ -53,14 +53,14 @@ a {
   color: var(--accent)
 }
 
-.app {
+/* .app {
   max-width: 1400px;
   margin: 0 auto;
   padding: clamp(12px, 2vw, 24px);
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-}
+} */
 
 .hora {
   display: flex;
@@ -68,8 +68,8 @@ a {
 }
 
 .clock {
-  margin-left: 1000px;
-  font-size: 30px;
+  margin-left: 900px;
+  font-size: 25px;
 }
 
 header {

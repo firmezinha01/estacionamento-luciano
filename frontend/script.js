@@ -229,7 +229,6 @@ function computeCharge(t, end) {
   return { subtotal, desconto, taxa_extra, total: subtotal - desconto + taxa_extra };
 }
 
-// Finalizar e imprimir
 async function finalizeTicketAndHistory(method) {
   const id = $finishTicket.value; if (!id) return;
   const t = state.tickets.find(x => x.id == id); if (!t) return;
@@ -241,7 +240,7 @@ async function finalizeTicketAndHistory(method) {
     const res = await fetch(`${API}/tickets/${id}/finalizar`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        saida: saidaStr, // ✅ ISO
+        saida: saidaStr,
         subtotal: c.subtotal,
         desconto: c.desconto,
         taxa_extra: c.taxa_extra,
@@ -251,18 +250,32 @@ async function finalizeTicketAndHistory(method) {
         marca_modelo: t.marca_modelo ?? null
       })
     });
-    const updated = await res.json();
+
+    const updated = await res.json(); // ✅ pega o ticket atualizado
+
     state.history.unshift(updated);
-    renderHistoryToday(); // ✅ usa a versão corrigida
+    renderHistoryToday();
     showMessage(`Ticket ${id} finalizado.`, "success");
 
-    // Impressão automática via RawBT
-    const escposRes = await fetch(`${API}/gerar-ticket-escpos`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated)
-    });
-    const escpos = await escposRes.text();
-    window.open("rawbt://print?data=" + encodeURIComponent(escpos));
+    // 🔎 Detecta se é celular ou computador
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Mantém impressão via RawBT
+      const escposRes = await fetch(`${API}/gerar-ticket-escpos`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+      const escpos = await escposRes.text();
+      window.open("rawbt://print?data=" + encodeURIComponent(escpos));
+    } else {
+      // Impressão via cabo no PC
+      await fetch(`${API}/imprimir-ticket`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+    }
 
   } catch (err) {
     console.error("Erro ao finalizar:", err);

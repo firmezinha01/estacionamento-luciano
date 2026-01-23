@@ -4,6 +4,11 @@ import { Pool } from "pg";
 import ticketsRouter from "./routes/tickets.js";
 import dotenv from "dotenv";
 import os from "os";
+import escpos from "escpos";
+import escposUSB from "escpos-usb";
+
+escpos.USB = escposUSB; // habilita USB
+
 
 dotenv.config();
 console.log("DATABASE_URL:", process.env.DATABASE_URL);
@@ -130,6 +135,30 @@ async function gerarEscPosTicket(ticket) {
 
   return escpos;
 }
+
+// ================= ENDPOINT IMPRESSÃO DIRETA =================
+app.post("/imprimir-ticket", async (req, res) => {
+  try {
+    const ticket = req.body;
+    const escposData = await gerarEscPosTicket(ticket);
+
+    const device = new escpos.USB();       // abre conexão USB
+    const printer = new escpos.Printer(device);
+
+    device.open(() => {
+      printer
+        .encode("utf8")                    // garante acentos corretos
+        .text(escposData)                  // envia o ESC/POS gerado
+        .cut()
+        .close();
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Erro ao imprimir:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // ================= ENDPOINT ESC/POS =================
 app.post("/gerar-ticket-escpos", async (req, res) => {
