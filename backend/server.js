@@ -140,15 +140,55 @@ async function gerarEscPosTicket(ticket) {
 app.post("/imprimir-ticket", async (req, res) => {
   try {
     const ticket = req.body;
-    const escposData = await gerarEscPosTicket(ticket);
 
-    const device = new escpos.USB();       // abre conexão USB
+    const device = new escpos.USB();
     const printer = new escpos.Printer(device);
 
     device.open(() => {
+      // Cabeçalho
       printer
-        .encode("utf8")                    // garante acentos corretos
-        .text(escposData)                  // envia o ESC/POS gerado
+        .encode("utf8")
+        .align("ct")
+        .style("b")
+        .size(1, 1)
+        .text("LS Estacionamento")
+        .text("--------------------------");
+
+      // Dados principais
+      printer
+        .align("lt")
+        .style("normal")
+        .size(0, 0)
+        .text(`Data: ${ticket.data}`)
+        .text(`Cliente: ${ticket.nome}`)
+        .style("b")
+        .size(1, 1)
+        .text(`Placa: ${ticket.placa}`)
+        .style("b")
+        .size(1, 1)
+        .text(`Valor: R$ ${ticket.total.toFixed(2)}`)
+        .text("--------------------------");
+
+      // QR Code PIX (se aplicável)
+      if (ticket.pagamento === "pix" && ticket.pixPayload) {
+        printer
+          .align("ct")
+          .style("normal")
+          .size(0, 0)
+          .text("PAGAMENTO VIA PIX")
+          .text("Escaneie o QR Code abaixo:");
+
+        const qrBytes = Buffer.from(escposQrCode(ticket.pixPayload), "binary");
+        device.write(qrBytes);
+      }
+
+      // Rodapé
+      printer
+        .align("ct")
+        .style("normal")
+        .size(0, 0)
+        .text("Obrigado pela preferência!")
+        .text("Guarde este comprovante.")
         .cut()
         .close();
     });
@@ -159,6 +199,7 @@ app.post("/imprimir-ticket", async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 
 // ================= ENDPOINT ESC/POS =================
 app.post("/gerar-ticket-escpos", async (req, res) => {
