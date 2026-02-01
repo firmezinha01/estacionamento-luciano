@@ -70,11 +70,11 @@ async function gerarEscPosTicket(ticket) {
   escpos += escposInit();
 
   // Cabeçalho com nome em destaque
-  
+
   escpos += escposAlignCenter();
-  escpos += escposDoubleWidthOn(); // só largura dupla
+  escpos += escposDoubleSizeOn(); // só largura dupla
   escpos += "LS ESTACIONAMENTO\n";
-  escpos += escposDoubleWidthOff();
+  escpos += escposDoubleSizeOff();
   escpos += escposNewLines(1);
 
   escpos += escposAlignCenter();
@@ -84,11 +84,11 @@ async function gerarEscPosTicket(ticket) {
   escpos += "------------------------------\n";
 
   escpos += escposAlignCenter();
-  escpos += escposAlignLeft();
+  // escpos += escposAlignLeft();
   escpos += `Ticket: ${ticket.id}\n`;
   escpos += `Nome: ${ticket.nome || "--"}\n`;
   escpos += `Telefone: ${ticket.telefone || "--"}\n`;
-  escpos += `Marca_Modelo: ${ticket.marca_modelo || "--"}\n`;
+  escpos += `Marca/Modelo: ${ticket.marca_modelo || "--"}\n`;
   escpos += `Placa: ${ticket.placa}\n`;
   escpos += `Vaga: ${ticket.vaga}\n`;
   escpos += `Obs: ${ticket.observacoes || "--"}\n`;
@@ -136,69 +136,73 @@ async function gerarEscPosTicket(ticket) {
   return escpos;
 }
 
-// ================= ENDPOINT IMPRESSÃO DIRETA =================
-app.post("/imprimir-ticket", async (req, res) => {
-  try {
-    const ticket = req.body;
-
-    const device = new escpos.USB();
-    const printer = new escpos.Printer(device);
-
-    device.open(() => {
-      // Cabeçalho
-      printer
-        .encode("utf8")
-        .align("ct")
-        .style("b")
-        .size(1, 1)
-        .text("LS Estacionamento")
-        .text("--------------------------");
-
-      // Dados principais
-      printer
-        .align("lt")
-        .style("normal")
-        .size(0, 0)
-        .text(`Data: ${ticket.data}`)
-        .text(`Cliente: ${ticket.nome}`)
-        .style("b")
-        .size(1, 1)
-        .text(`Placa: ${ticket.placa}`)
-        .style("b")
-        .size(1, 1)
-        .text(`Valor: R$ ${ticket.total.toFixed(2)}`)
-        .text("--------------------------");
-
-      // QR Code PIX (se aplicável)
-      if (ticket.pagamento === "pix" && ticket.pixPayload) {
-        printer
-          .align("ct")
-          .style("normal")
-          .size(0, 0)
-          .text("PAGAMENTO VIA PIX")
-          .text("Escaneie o QR Code abaixo:");
-
-        const qrBytes = Buffer.from(escposQrCode(ticket.pixPayload), "binary");
-        device.write(qrBytes);
-      }
-
-      // Rodapé
-      printer
-        .align("ct")
-        .style("normal")
-        .size(0, 0)
-        .text("Obrigado pela preferência!")
-        .text("Guarde este comprovante.")
-        .cut()
-        .close();
-    });
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("Erro ao imprimir:", err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+// ============IMPRESSÃO==========
+app.post("/imprimir-ticket", (req, res) => {
+  res.json({ ok: true, ticket: req.body });
 });
+// // ================= ENDPOINT IMPRESSÃO DIRETA =================
+// app.post("/imprimir-ticket", async (req, res) => {
+//   try {
+//     const ticket = req.body;
+
+//     const device = new escpos.USB();
+//     const printer = new escpos.Printer(device);
+
+//     device.open(() => {
+//       // Cabeçalho
+//       printer
+//         .encode("utf8")
+//         .align("ct")
+//         .style("b")
+//         .size(1, 1)
+//         .text("LS Estacionamento")
+//         .text("--------------------------");
+
+//       // Dados principais
+//       printer
+//         .align("lt")
+//         .style("normal")
+//         .size(0, 0)
+//         .text(`Data: ${ticket.data}`)
+//         .text(`Cliente: ${ticket.nome}`)
+//         .style("b")
+//         .size(1, 1)
+//         .text(`Placa: ${ticket.placa}`)
+//         .style("b")
+//         .size(1, 1)
+//         .text(`Valor: R$ ${ticket.total.toFixed(2)}`)
+//         .text("--------------------------");
+
+//       // QR Code PIX (se aplicável)
+//       if (ticket.pagamento === "pix" && ticket.pixPayload) {
+//         printer
+//           .align("ct")
+//           .style("normal")
+//           .size(0, 0)
+//           .text("PAGAMENTO VIA PIX")
+//           .text("Escaneie o QR Code abaixo:");
+
+//         const qrBytes = Buffer.from(escposQrCode(ticket.pixPayload), "binary");
+//         device.write(qrBytes);
+//       }
+
+//       // Rodapé
+//       printer
+//         .align("ct")
+//         .style("normal")
+//         .size(0, 0)
+//         .text("Obrigado pela preferência!")
+//         .text("Guarde este comprovante.")
+//         .cut()
+//         .close();
+//     });
+
+//     res.json({ ok: true });
+//   } catch (err) {
+//     console.error("Erro ao imprimir:", err);
+//     res.status(500).json({ ok: false, error: err.message });
+//   }
+// });
 
 
 // ================= ENDPOINT ESC/POS =================
