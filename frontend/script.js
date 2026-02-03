@@ -39,30 +39,44 @@ function showMessage(msg, type = "info") {
   }
 }
 
-// 🔵 IMPRESSÃO NO NAVEGADOR (PC)
-function imprimirTicket(ticket) {
-  const conteudo = `
-    <div style="font-family: monospace; width: 260px; padding: 10px;">
-      <h3 style="text-align:center; margin:0;">LS Estacionamento</h3>
-      <div style="text-align:center;">------------------------------</div>
+// 🔵 IMPRESSÃO SP-120 VIA BLUETOOTH (PC)
+async function imprimirTicket(ticket) {
+  try {
+    // 1. Buscar ESC/POS do backend
+    const res = await fetch(`${API}/gerar-ticket-escpos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ticket)
+    });
 
-      <div>Data: ${dtDisp(parseLocalTimestamp(ticket.entrada))}</div>
-      <div>Cliente: ${ticket.nome}</div>
-      <div style="font-size:18px; font-weight:bold;">Placa: ${ticket.placa}</div>
-      <div style="font-size:18px; font-weight:bold;">Valor: R$ ${ticket.total.toFixed(2)}</div>
+    const escpos = await res.text();
+    const encoder = new TextEncoder("utf-8");
+    const data = encoder.encode(escpos);
 
-      <div style="text-align:center;">------------------------------</div>
-      <div style="text-align:center;">Obrigado pela preferência!</div>
-      <div style="text-align:center;">Guarde este comprovante.</div>
-    </div>
-  `;
+    // 2. Conectar à impressora SP-120 via WebBluetooth
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "SP" }],
+      optionalServices: [0xfff0]
+    });
 
-  const janela = window.open("", "_blank", "width=300,height=600");
-  janela.document.write(conteudo);
-  janela.document.close();
-  janela.focus();
-  janela.print();
-  janela.close();
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(0xfff0);
+    const characteristic = await service.getCharacteristic(0xfff2);
+
+    // 3. Enviar ESC/POS em pacotes
+    const chunkSize = 180;
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize);
+      await characteristic.writeValue(chunk);
+      await new Promise(r => setTimeout(r, 30));
+    }
+
+    alert("Ticket impresso com sucesso!");
+
+  } catch (err) {
+    console.error("Erro ao imprimir:", err);
+    alert("Erro ao imprimir: " + err.message);
+  }
 }
 
 // Relógio
@@ -126,7 +140,13 @@ async function createTicket() {
       })
     });
     const ticket = await res.json();
-    if (ticket && ticket.id) { state.tickets.push(ticket); renderActive(); renderFinishSelect(); showMessage(`Ticket ${ticket.id} criado.`, "success"); alert("Ticket gerado com sucesso!"); }
+    if (ticket && ticket.id) {
+      state.tickets.push(ticket);
+      renderActive();
+      renderFinishSelect();
+      showMessage(`Ticket ${ticket.id} criado.`, "success");
+      alert("Ticket gerado com sucesso!");
+    }
     else showMessage("Erro ao criar ticket", "error");
   } catch (err) { console.error("Erro ao criar ticket:", err); showMessage("Erro ao criar ticket", "error"); }
 }
@@ -188,8 +208,8 @@ slotField.addEventListener("input", () => {
 
 // Render ativos
 function renderActive() {
-  $activeList.innerHTML = state.tickets.length === 0 
-    ? '<li class="no-ticket">Nenhum Ticket Ativo</li>' 
+  $activeList.innerHTML = state.tickets.length === 0
+    ? '<li class="no-ticket">Nenhum Ticket Ativo</li>'
     : '';
 
   state.tickets.forEach(t => {
@@ -246,29 +266,28 @@ async function finalizeTicketAndHistory(method) {
 
     const updated = await res.json();
 
-// 🔥 Conversão definitiva
-updated.subtotal   = Number(updated.subtotal);
-updated.desconto   = Number(updated.desconto);
-updated.taxa_extra = Number(updated.taxa_extra);
-updated.total      = Number(updated.total);
+    updated.subtotal   = Number(updated.subtotal);
+    updated.desconto   = Number(updated.desconto);
+    updated.taxa_extra = Number(updated.taxa_extra);
+    updated.total      = Number(updated.total);
 
-state.history.unshift(updated);
-renderHistoryToday();
-showMessage(`Ticket ${id} finalizado.`, "success");
+    state.history.unshift(updated);
+    renderHistoryToday();
+    showMessage(`Ticket ${id} finalizado.`, "success");
 
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-if (isMobile) {
-  const escposRes = await fetch(`${API}/gerar-ticket-escpos`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updated)
-  });
-  const escpos = await escposRes.text();
-  window.open("rawbt://print?data=" + encodeURIComponent(escpos));
-} else {
-  imprimirTicket(updated);
-}
+    if (isMobile) {
+      const escposRes = await fetch(`${API}/gerar-ticket-escpos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+      const escpos = await escposRes.text();
+      window.open("rawbt://print?data=" + encodeURIComponent(escpos));
+    } else {
+      await imprimirTicket(updated);
+    }
 
   } catch (err) {
     console.error("Erro ao finalizar:", err);
@@ -369,6 +388,13 @@ function renderHistoryByDate(dateStr) {
   });
 }
 
+// Reimpressão
+async function reimprimirTicket(id) {
+  const ticket = state.history.find(t => t.id == id);
+  if (!ticket) return alert("Ticket não encontrado");
+  await imprimirTicket(ticket);
+}
+
 // Botão "Gerar histórico"
 document.getElementById("generateHistory").addEventListener("click", () => {
   const dateStr = document.getElementById("historyDate").value;
@@ -414,10 +440,8 @@ async function loadHistory() {
     const res = await fetch(`${API}/tickets/history`);
     state.history = await res.json();
 
-    // Atualiza histórico do dia
     renderHistoryToday();
 
-    // Se houver uma data selecionada, atualiza também a tabela por data
     const dateStr = document.getElementById("historyDate")?.value;
     if (dateStr) renderHistoryByDate(dateStr);
   } catch (err) {
