@@ -56,12 +56,12 @@ async function imprimirTicket(ticket) {
     // 2. Conectar à impressora SP-120 via WebBluetooth
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: "SP" }],
-      optionalServices: [0xfff0]
+      optionalServices: [0xFFE0]
     });
 
     const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(0xfff0);
-    const characteristic = await service.getCharacteristic(0xfff2);
+    const service = await server.getPrimaryService(0xFFE0);
+    const characteristic = await service.getCharacteristic(0xFFE1);
 
     // 3. Enviar ESC/POS em pacotes
     const chunkSize = 180;
@@ -78,6 +78,44 @@ async function imprimirTicket(ticket) {
     alert("Erro ao imprimir: " + err.message);
   }
 }
+// async function imprimirTicket(ticket) {
+//   try {
+//     // 1. Buscar ESC/POS do backend
+//     const res = await fetch(`${API}/gerar-ticket-escpos`, {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify(ticket)
+//     });
+
+//     const escpos = await res.text();
+//     const encoder = new TextEncoder("utf-8");
+//     const data = encoder.encode(escpos);
+
+//     // 2. Conectar à impressora SP-120 via WebBluetooth
+//     const device = await navigator.bluetooth.requestDevice({
+//       filters: [{ namePrefix: "SP" }],
+//       optionalServices: [0xfff0]
+//     });
+
+//     const server = await device.gatt.connect();
+//     const service = await server.getPrimaryService(0xfff0);
+//     const characteristic = await service.getCharacteristic(0xfff2);
+
+//     // 3. Enviar ESC/POS em pacotes
+//     const chunkSize = 180;
+//     for (let i = 0; i < data.length; i += chunkSize) {
+//       const chunk = data.slice(i, i + chunkSize);
+//       await characteristic.writeValue(chunk);
+//       await new Promise(r => setTimeout(r, 30));
+//     }
+
+//     alert("Ticket impresso com sucesso!");
+
+//   } catch (err) {
+//     console.error("Erro ao imprimir:", err);
+//     alert("Erro ao imprimir: " + err.message);
+//   }
+// }
 
 // Relógio
 function tickClock() {
