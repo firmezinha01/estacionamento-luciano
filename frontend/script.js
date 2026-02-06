@@ -50,32 +50,29 @@ async function imprimirTicket(ticket) {
     });
 
     const escpos = await res.text();
-    const encoder = new TextEncoder("utf-8");
-    const data = encoder.encode(escpos);
 
-    // 2. Conectar à impressora SP-120 via WebBluetooth
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: "SP" }],
-      optionalServices: [0xFFE0]
-    });
+    // 2. Conectar ao QZ Tray
+    await qz.websocket.connect();
 
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(0xFFE0);
-    const characteristic = await service.getCharacteristic(0xFFE1);
+    // 3. Encontrar a impressora SP-120
+    const printer = await qz.printers.find("SP");
 
-    // 3. Enviar ESC/POS em pacotes
-    const chunkSize = 180;
-    for (let i = 0; i < data.length; i += chunkSize) {
-      const chunk = data.slice(i, i + chunkSize);
-      await characteristic.writeValue(chunk);
-      await new Promise(r => setTimeout(r, 30));
-    }
+    const config = qz.configs.create(printer);
+
+    // 4. Enviar ESC/POS para impressão
+    const data = [
+      { type: 'raw', format: 'plain', data: escpos }
+    ];
+
+    await qz.print(config, data);
 
     alert("Ticket impresso com sucesso!");
 
   } catch (err) {
     console.error("Erro ao imprimir:", err);
     alert("Erro ao imprimir: " + err.message);
+  } finally {
+    try { qz.websocket.disconnect(); } catch {}
   }
 }
 // async function imprimirTicket(ticket) {
