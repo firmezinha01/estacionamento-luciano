@@ -209,8 +209,45 @@
   </div>
 
   <!-- Comprovante -->
-  <div id="printable" class="printable">
-    <h3>Comprovante de estacionamento</h3>
+<div id="printable" class="printable only-print">
+  <img src="./logo.png" alt="Logo" class="ticket-logo">
+
+  <h3 style="font-size: 18px; font-weight: 600; text-align: center; margin: 4px 0;">
+    Comprovante de estacionamento
+  </h3>
+
+  <div class="price-line"><span>Estabelecimento:</span><span id="p_company">LS Estacionamento</span></div>
+  <div class="price-line"><span>Endereço:</span><span id="p_addr">Praia da Cigarra</span></div>
+  <div class="divider"></div>
+
+  <div class="price-line"><span>Ticket:</span><span id="p_id"></span></div>
+  <div class="price-line"><span>Nome:</span><span id="p_name"></span></div>
+  <div class="price-line"><span>Telefone:</span><span id="p_tel"></span></div>
+  <div class="price-line"><span>Marca Modelo:</span><span id="p_marca_modelo"></span></div>
+  <div class="price-line"><span>Placa:</span><span id="p_plate"></span></div>
+  <div class="price-line"><span>Vaga:</span><span id="p_slot"></span></div>
+  <div class="price-line"><span>Entrada:</span><span id="p_start"></span></div>
+  <div class="price-line"><span>Saída:</span><span id="p_end"></span></div>
+  <div class="price-line"><span>Tempo:</span><span id="p_duration"></span></div>
+
+  <div class="divider"></div>
+
+  <div class="price-line"><span>Valor fixo diário:</span><span id="p_dailyValue"></span></div>
+  <div class="price-line"><span>Subtotal:</span><span id="p_subtotal"></span></div>
+  <div class="price-line"><span>Desconto:</span><span id="p_discount"></span></div>
+  <div class="price-line"><span>Taxa extra:</span><span id="p_extra"></span></div>
+  <div class="price-line"><span>Total:</span><span id="p_total"></span></div>
+  <div class="price-line"><span>Pagamento:</span><span id="p_method"></span></div>
+
+  <div class="divider"></div>
+
+  <div class="small">Obrigado pela preferência!</div>
+</div>
+  <!-- <div id="printable" class="printable">
+  <img src="./logo.png" alt="Logo" class="ticket-logo">
+   <h3 style="font-size: 18px; font-weight: 600; text-align: center; margin: 4px 0;">
+  Comprovante de estacionamento
+</h3>
     <div class="price-line"><span>Estabelecimento:</span><span id="p_company">LS Estacionamento</span></div>
     <div class="price-line"><span>Endereço:</span><span id="p_addr">Praia da Cigarra</span></div>
     <div class="divider"></div>
@@ -232,13 +269,12 @@
     <div class="price-line"><span>Pagamento:</span><span id="p_method"></span></div>
     <div class="divider"></div>
     <div class="small">Obrigado pela preferência!</div>
-  </div>
+  </div> -->
 
   <div id="btStatus" class="muted" style="margin-top:8px"></div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js"></script>
-  <script src="script.js"></script>
+<script src="script.js"></script>
 
   <!-- Registro do Service Worker -->
   <script>
